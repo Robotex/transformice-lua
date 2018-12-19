@@ -1,18 +1,19 @@
 -- Configuration settings
 local g_config = {
-    admins = {"Junny1992#0000"},
+    admins = {"Junny1992#0000", "Ruka#0823"},
     spawnX = 250,
     spawnY = 250,
     toysAreas = {
-        {x1 = 0, y1 = 0, x2 = 250, y2 = 600}
+        {x1 = 1458, y1 = 297, x2 = 1590, y2 = 370}
     },
     packingAreas = {
-        {x1 = 250, y1 = 0, x2 = 500, y2 = 600}
+        {x1 = 954, y1 = 245, x2 = 1228, y2 = 245}
     },
     dropOffAreas = {
-        {x1 = 500, y1 = 0, x2 = 750, y2 = 600}
+        {x1 = 109, y1 = 285, x2 = 284, y2 = 384}
     },
-    minigameChars = {"q","r","t","y","u","i","o","p","f","g","h","j","k","l","z","x","c","v","b","n","m","1","2","3","4","5","6","7","8","9","0"}
+    minigameChars = {"q","r","u","o","p","f","g","h","j","k","l","z","x","c","v","b","n","m"},
+    map = "@7550816"
 }
 
 -- Local globals
@@ -65,7 +66,6 @@ end
 -- Script core logic
 local function init()
     tfm.exec.setUIMapName("Greenwolves - Natale 2018")
-    tfm.exec.setUIShamanName("Biscuitfioc#0000")
     tfm.exec.disableAutoShaman(true)
     tfm.exec.disableAutoNewGame(true)
     tfm.exec.disableAutoScore(true)
@@ -228,22 +228,6 @@ function eventChatCommand(playerName, message)
             print (string.byte(string.upper("m"),1))
         elseif message == "win" then
             tfm.exec.playerVictory(playerName)
-        elseif message == "speedynut" then
-            tfm.exec.newGame("@7450641")
-        elseif message == "biscuitfioc" then
-            addTimer(function()
-                for i=125,1200,50
-                do
-                    tfm.exec.addShamanObject(6,i,25,0,0,0,false)
-                end
-            end, 3000, true)
-        elseif message == "ares" then
-            tfm.exec.changePlayerSize("Junny1992", 0.1)
-            tfm.exec.setVampirePlayer("Junny1992", false)
-            addTimer(function()
-                tfm.exec.setNameColor("Junny1992", lastColor)
-                lastColor = (lastColor + 0x1) % 0xFFFFFF
-            end, 500, true)
         elseif message == "reset" then
             resetGame()
         elseif message == "exit" then
@@ -252,30 +236,6 @@ function eventChatCommand(playerName, message)
     end
     if message == "reset" then
         resetPlayer(playerName)
-    elseif message == "electraloves" then
-        tfm.exec.newGame("#0")
-    elseif message == "test" then
-        print(tfm.get.room.playerList["Junny1992#0000"].tribeName)
-        tfm.exec.playEmote("Ruka#0823", 3, nil)
-    elseif message == "tiny" then
-        tfm.exec.changePlayerSize(playerName, 0.1)
-    elseif message == "normal" then
-        tfm.exec.changePlayerSize(playerName, 1)
-    elseif message == "giant" then
-        tfm.exec.changePlayerSize(playerName, 5)
-    elseif message == "vampireon" then
-        tfm.exec.setVampirePlayer(playerName, true)
-    elseif message == "vampireoff" then
-        tfm.exec.setVampirePlayer(playerName, false)
-    elseif message == "score" then
-        tfm.exec.setPlayerScore(playerName, 10000, true)
-    elseif message == "kissme" then
-        for playerName, _ in pairs(tfm.get.room.playerList)
-        do
-            if not isAdministrator(playerName) then
-                tfm.exec.playEmote(playerName, 21, nil)
-            end
-        end
     end
 end
 
@@ -291,7 +251,7 @@ function eventKeyboard(playerName, keyCode, down, xPlayerPosition, yPlayerPositi
                     print(playerName .. " ha raccolto un giocattolo")
                     return
                 elseif player.carrying == 1 then
-                    showToast("<p align=\"center\">Hai già un giocattolo nell’inventario!", 1000, playerName)
+                    showToast("<p align=\"center\">Hai già un giocattolo nell’inventario!", 1000, playerName)
                     return
                 end
             end
@@ -305,7 +265,7 @@ function eventKeyboard(playerName, keyCode, down, xPlayerPosition, yPlayerPositi
                     showToast("<p align=\"center\">Premi " .. string.char(player.minigame.nextKeyCode), 3000, playerName)
                     return
                 elseif player.carrying == 2 then
-                    showToast("<p align=\"center\">Hai già un regalo nell’inventario!", 1000, playerName)
+                    showToast("<p align=\"center\">Hai già un regalo nell’inventario!", 1000, playerName)
                     return
                 end
             elseif player and down == true and keyCode == player.minigame.nextKeyCode and player.carrying == 1 then
