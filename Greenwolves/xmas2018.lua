@@ -1,8 +1,11 @@
 -- Configuration settings
 local g_config = {
     admins = {"Junny1992#0000", "Ruka#0823"},
-    spawnX = 250,
-    spawnY = 250,
+    spawn = { x = 0, y = 0 },
+    spawnAreas = {
+        SECOND_FLOOR = {x = 855, y = 162},
+        START = {x = 20, y = 370}
+    },
     toysAreas = {
         {x1 = 1458, y1 = 297, x2 = 1590, y2 = 370}
     },
@@ -65,12 +68,15 @@ end
 
 -- Script core logic
 local function init()
+    tfm.exec.newGame(g_config.map)
     tfm.exec.setUIMapName("Greenwolves - Natale 2018")
     tfm.exec.disableAutoShaman(true)
     tfm.exec.disableAutoNewGame(true)
     tfm.exec.disableAutoScore(true)
     tfm.exec.disableAutoTimeLeft(true)
     tfm.exec.disableAfkDeath(true)
+
+    g_config.spawn = g_config.spawnAreas.SECOND_FLOOR
 
     for playerName, _ in pairs(tfm.get.room.playerList)
     do
@@ -131,8 +137,9 @@ end
 
 local function startGame()
     g_gameState = 2
+    g_config.spawn = g_config.spawnAreas.START
     for playerName, player in pairs(g_players) do
-        eventPlayerRespawn(playerName)
+        tfm.exec.killPlayer(playerName)
     end
     tfm.exec.setGameTime(300)
 end
@@ -153,15 +160,22 @@ local function endGame()
     }
     local scoreboard = {}
 
-    for playerName, player in pairs(g_players)
+    g_config.spawn = g_config.spawnAreas.SECOND_FLOOR
+    for playerName, _ in pairs(tfm.get.room.playerList)
     do
-        table.insert(scoreboard, playerData)
+        tfm.exec.killPlayer(playerName)
     end
 
-    table.sort(scoreboard, function(a,b) return a.score<b.score end)
+    for playerName, player in pairs(g_players)
+    do
+        table.insert(scoreboard, player)
+    end
+
+    table.sort(scoreboard, function(a,b) return a.score>b.score end)
 
     local highscorePosition = 1
     for i=1, #scoreboard do
+        print ("[" .. scoreboard[i].score .. "] " .. scoreboard[i].name)
         table.insert(highscores[highscorePosition], scoreboard[i])
         if i < #scoreboard then
             if scoreboard[i + 1].score ~= scoreboard[i].score then
@@ -224,6 +238,7 @@ function eventChatCommand(playerName, message)
             endGame()
         elseif message == "debug" then
             addPlayer(playerName)
+            increasePlayerScore(playerName)
         elseif message == "lua" then
             print (string.byte(string.upper("m"),1))
         elseif message == "win" then
@@ -319,9 +334,7 @@ function eventPlayerDied(playerName)
 end
 
 function eventPlayerRespawn(playerName)
-    if g_gameState > 0 then
-        tfm.exec.movePlayer(playerName, g_config.spawnX, g_config.spawnY, false, 0, 0, false)
-    end
+    tfm.exec.movePlayer(playerName, g_config.spawn.x, g_config.spawn.y, false, 0, 0, false)
 end
 
 function eventNewGame()
