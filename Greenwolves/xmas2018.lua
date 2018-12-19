@@ -337,6 +337,7 @@ function eventKeyboard(playerName, keyCode, down, xPlayerPosition, yPlayerPositi
             elseif down == true and player.minigame.nextKeyCode > 0 and keyCode ~= player.minigame.nextKeyCode and player.carrying == 1 then
                 player.minigame.combo = 0
                 player.carrying = 0
+                player.minigame.nextKeyCode = 0
                 ui.removeTextArea(g_textAreaIds.inventory, playerName)
                 ui.removeTextArea(g_textAreaIds.hint, playerName)
                 showToast("<p align=\"center\">Peccato! Hai rotto il giocattolo :(", 1000, playerName)
