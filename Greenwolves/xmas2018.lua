@@ -10,13 +10,15 @@ local g_config = {
         {x1 = 1458, y1 = 297, x2 = 1590, y2 = 370}
     },
     packingAreas = {
-        {x1 = 954, y1 = 245, x2 = 1228, y2 = 245}
+        {x1 = 954, y1 = 315, x2 = 1033, y2 = 345},
+        {x1 = 1114, y1 = 315, x2 = 1228, y2 = 345}
     },
     dropOffAreas = {
         {x1 = 109, y1 = 285, x2 = 284, y2 = 384}
     },
     minigameChars = {"q","r","u","o","p","f","g","h","j","k","l","z","x","c","v","b","n","m"},
-    map = "@7550816"
+    map = "@7550816",
+    doorId = 10
 }
 
 -- Local globals
@@ -28,7 +30,8 @@ local g_textAreaIds = {
     countdown = 1,
     inventory = 2,
     toast = 3,
-    scoreboard = 4
+    scoreboard = 4,
+    hint = 5
 }
 
 -- Utilities
@@ -67,25 +70,6 @@ local function showToast(text, duration, playerName)
 end
 
 -- Script core logic
-local function init()
-    tfm.exec.newGame(g_config.map)
-    tfm.exec.setUIMapName("Greenwolves - Natale 2018")
-    tfm.exec.disableAutoShaman(true)
-    tfm.exec.disableAutoNewGame(true)
-    tfm.exec.disableAutoScore(true)
-    tfm.exec.disableAutoTimeLeft(true)
-    tfm.exec.disableAfkDeath(true)
-
-    g_config.spawn = g_config.spawnAreas.SECOND_FLOOR
-
-    for playerName, _ in pairs(tfm.get.room.playerList)
-    do
-        eventNewPlayer(playerName)
-    end
-
-    print("Script inizializzato!")
-end
-
 local function addPlayer(playerName)
     local player = g_players[playerName]
     if player == nil then
@@ -95,7 +79,7 @@ local function addPlayer(playerName)
             carrying = 0,
             score = 0,
             minigame = {
-                nextKeyCode = string.byte(string.upper(g_config.minigameChars[math.random(#g_config.minigameChars)]), 1),
+                nextKeyCode = 0,
                 combo = 0
             }
         }
@@ -103,6 +87,14 @@ local function addPlayer(playerName)
     end
     tfm.exec.setPlayerScore(playerName, player.score, false)
     system.bindKeyboard(playerName, 32, true, true)
+    system.bindKeyboard(playerName, 1, false, true)
+    system.bindKeyboard(playerName, 2, false, true)
+    system.bindKeyboard(playerName, 3, false, true)
+    system.bindKeyboard(playerName, 4, false, true)
+    system.bindKeyboard(playerName, 1, true, true)
+    system.bindKeyboard(playerName, 2, true, true)
+    system.bindKeyboard(playerName, 3, true, true)
+    system.bindKeyboard(playerName, 4, true, true)
 
     for _, char in ipairs(g_config.minigameChars) do
         local keyCode = string.byte(string.upper(char), 1)
@@ -113,6 +105,9 @@ end
 local function resetPlayer(playerName)
     local player = g_players[playerName]
     if player ~= nil then
+        player.nextKeyCode = 0
+        player.carrying = 0
+        player.combo = 0
         eventNewPlayer(playerName)
         tfm.exec.killPlayer(playerName)
     end
@@ -135,20 +130,39 @@ local function increasePlayerScore(playerName)
     end
 end
 
+local function isPlayer(playerName)
+    return g_players[playerName] ~= nil
+end
+
+local function openDoor()
+    tfm.exec.removePhysicObject(g_config.doorId)
+end
+
 local function startGame()
     g_gameState = 2
-    g_config.spawn = g_config.spawnAreas.START
-    for playerName, player in pairs(g_players) do
-        tfm.exec.killPlayer(playerName)
-    end
     tfm.exec.setGameTime(300)
+    openDoor()
 end
 
 local function resetGame()
-    tfm.exec.addShamanObject(61, 400, 350, 0, 0, 0, false)
-    g_gameState = 0
     for _, id in pairs(g_textAreaIds) do
         ui.removeTextArea(id, nil)
+    end
+
+    tfm.exec.newGame(g_config.map)
+    tfm.exec.setUIMapName("Greenwolves - Natale 2018")
+    tfm.exec.setGameTime(0)
+
+    g_gameState = 0
+    g_players = {}
+
+    g_config.spawn = g_config.spawnAreas.START
+
+    for playerName, _ in pairs(tfm.get.room.playerList)
+    do
+        eventNewPlayer(playerName)
+        tfm.exec.setPlayerScore(playerName, 0, false)
+        tfm.exec.killPlayer(playerName)
     end
 end
 
@@ -160,6 +174,7 @@ local function endGame()
     }
     local scoreboard = {}
 
+    g_gameState = 3
     g_config.spawn = g_config.spawnAreas.SECOND_FLOOR
     for playerName, _ in pairs(tfm.get.room.playerList)
     do
@@ -200,12 +215,16 @@ local function endGame()
         scoreboardText = scoreboardText .. "[" .. player.name .. "]"
     end
 
-    ui.addTextArea(g_textAreaIds.scoreboard, scoreboardText, nil, 300, 270, 200, 60, 0x324650, 0x000000, 1, true)
+    ui.addTextArea(g_textAreaIds.scoreboard, scoreboardText, nil, 280, 250, 240, 80, 0x324650, 0x000000, 1, true)
 
 end
 
 local function startCountdown()
     g_gameState = 1
+    g_config.spawn = g_config.spawnAreas.START
+    for playerName, player in pairs(g_players) do
+    --    tfm.exec.killPlayer(playerName)
+    end
     local headerText = "<VP><p align=\"center\"><B>Siete pronti?</B>\n\n<CH>"
     local textAreaId = g_textAreaIds.countdown;
     ui.addTextArea(textAreaId, headerText, nil, 300, 270, 200, 60, 0x324650, 0x000000, 1, true)
@@ -224,8 +243,24 @@ local function startCountdown()
     countdown(3)
 end
 
-local function startMinigame(playerName)
+local function isInsideAreas(areas, xPlayerPosition, yPlayerPosition)
+    for _, area in ipairs(areas) do
+        if area.x1 < xPlayerPosition and xPlayerPosition < area.x2 and area.y1 < yPlayerPosition and yPlayerPosition < area.y2 then
+            return true
+        end
+    end
+    return false
+end
 
+local function init()
+    tfm.exec.disableAutoShaman(true)
+    tfm.exec.disableAutoNewGame(true)
+    tfm.exec.disableAutoScore(true)
+    tfm.exec.disableAutoTimeLeft(true)
+    tfm.exec.disableAfkDeath(true)
+    tfm.exec.disableAllShamanSkills(true)
+    resetGame()
+    print("Script inizializzato!")
 end
 
 -- Game delegates
@@ -234,17 +269,19 @@ function eventChatCommand(playerName, message)
     if isAdministrator(playerName) then
         if message == "start" then
             startCountdown(5)
-        elseif message == "end" then
+        elseif message == "endgame" then
             endGame()
+        elseif message == "resetgame" then
+            resetGame()
+        elseif message == "abracadabra" then
+            openDoor()
+        elseif message == "respawn" then
+            tfm.exec.respawnPlayer(playerName)
         elseif message == "debug" then
             addPlayer(playerName)
             increasePlayerScore(playerName)
-        elseif message == "lua" then
-            print (string.byte(string.upper("m"),1))
         elseif message == "win" then
             tfm.exec.playerVictory(playerName)
-        elseif message == "reset" then
-            resetGame()
         elseif message == "exit" then
             system.exit()
         end
@@ -257,65 +294,70 @@ end
 function eventKeyboard(playerName, keyCode, down, xPlayerPosition, yPlayerPosition)
     local player = g_players[playerName]
 
-    for _, toysArea in ipairs(g_config.toysAreas) do
-        if toysArea.x1 < xPlayerPosition and xPlayerPosition < toysArea.x2 and toysArea.y1 < yPlayerPosition and yPlayerPosition < toysArea.y2 then
-            if player and down == true and keyCode == 32 then
-                if player.carrying == 0 then
-                    player.carrying = 1
-                    ui.addTextArea(g_textAreaIds.inventory, "<p align=\"center\">Trasporti un giocattolo!", playerName, 5, 20, 200, 30, 0x324650, 0x000000, 1, true)
-                    print(playerName .. " ha raccolto un giocattolo")
-                    return
-                elseif player.carrying == 1 then
-                    showToast("<p align=\"center\">Hai già un giocattolo nell’inventario!", 1000, playerName)
-                    return
-                end
+    if isInsideAreas(g_config.toysAreas, xPlayerPosition, yPlayerPosition) then
+        if player and down == true and keyCode == 32 then
+            if player.carrying == 0 then
+                player.carrying = 1
+                ui.addTextArea(g_textAreaIds.inventory, "<p align=\"center\">Trasporti un giocattolo!", playerName, 5, 20, 200, 30, 0x324650, 0x000000, 1, true)
+                print(playerName .. " ha raccolto un giocattolo")
+                return
+            elseif player.carrying == 1 then
+                showToast("<p align=\"center\">Hai già un giocattolo nell’inventario!", 1000, playerName)
+                return
             end
         end
     end
 
-    for _, packingArea in ipairs(g_config.packingAreas) do
-        if packingArea.x1 < xPlayerPosition and xPlayerPosition < packingArea.x2 and packingArea.y1 < yPlayerPosition and yPlayerPosition < packingArea.y2 then
-            if player and down == true and keyCode == 32 then
-                if player.carrying == 1 then
-                    showToast("<p align=\"center\">Premi " .. string.char(player.minigame.nextKeyCode), 3000, playerName)
-                    return
+    if isInsideAreas(g_config.packingAreas, xPlayerPosition, yPlayerPosition) then
+        if player then
+            if player.minigame.nextKeyCode > 0 and (keyCode == 1 or keyCode == 2 or keyCode == 3 or keyCode == 4) and player.carrying == 1 then
+                ui.addTextArea(g_textAreaIds.hint, "<p align=\"center\">Premi " .. string.char(player.minigame.nextKeyCode), playerName, 300, 250, 200, 20, 0x324650, 0x000000, 0.6, true)
+            elseif down == true and keyCode == 32 then
+                if player.carrying == 1 and player.minigame.nextKeyCode == 0 then
+                    player.minigame.nextKeyCode = string.byte(string.upper(g_config.minigameChars[math.random(#g_config.minigameChars)]), 1)
+                    ui.addTextArea(g_textAreaIds.hint, "<p align=\"center\">Premi " .. string.char(player.minigame.nextKeyCode), playerName, 300, 250, 200, 20, 0x324650, 0x000000, 0.6, true)
                 elseif player.carrying == 2 then
                     showToast("<p align=\"center\">Hai già un regalo nell’inventario!", 1000, playerName)
                     return
                 end
-            elseif player and down == true and keyCode == player.minigame.nextKeyCode and player.carrying == 1 then
+            elseif down == true and keyCode == player.minigame.nextKeyCode and player.carrying == 1 then
                 player.minigame.combo = player.minigame.combo + 1
                 if player.minigame.combo > 5 then
+                    player.minigame.nextKeyCode = 0
                     player.minigame.combo = 0
                     player.carrying = 2
                     tfm.exec.giveCheese(playerName)
                     ui.removeTextArea(g_textAreaIds.inventory, playerName)
+                    ui.removeTextArea(g_textAreaIds.hint, playerName)
                     print(playerName .. " ha impacchettato il regalo")
                 else
                     player.minigame.nextKeyCode = string.byte(string.upper(g_config.minigameChars[math.random(#g_config.minigameChars)]), 1)
-                    showToast("<p align=\"center\">Premi " .. string.char(player.minigame.nextKeyCode), 3000, playerName)
+                    ui.updateTextArea(g_textAreaIds.hint, "<p align=\"center\">Premi " .. string.char(player.minigame.nextKeyCode), playerName)
                 end
-            elseif player and down == true and keyCode ~= player.minigame.nextKeyCode and player.carrying == 1 then
+            elseif down == true and player.minigame.nextKeyCode > 0 and keyCode ~= player.minigame.nextKeyCode and player.carrying == 1 then
                 player.minigame.combo = 0
                 player.carrying = 0
                 ui.removeTextArea(g_textAreaIds.inventory, playerName)
+                ui.removeTextArea(g_textAreaIds.hint, playerName)
                 showToast("<p align=\"center\">Peccato! Hai rotto il giocattolo :(", 1000, playerName)
                 print(playerName .. " ha rovinato il regalo")
             end
         end
+    else
+        if player and player.carrying == 1 and player.minigame.nextKeyCode > 0 then
+            ui.removeTextArea(g_textAreaIds.hint, playerName)
+        end
     end
 
-    for _, dropOffArea in ipairs(g_config.dropOffAreas) do
-        if dropOffArea.x1 < xPlayerPosition and xPlayerPosition < dropOffArea.x2 and dropOffArea.y1 < yPlayerPosition and yPlayerPosition < dropOffArea.y2 then
-            if player and down == true and keyCode == 32 then
-                if player.carrying == 2 then
-                    player.carrying = 0
-                    tfm.exec.removeCheese(playerName)
-                    increasePlayerScore(playerName)
-                    print(playerName .. " ha consegnato il regalo")
-                    showToast("<p align=\"center\">Regalo consegnato!", 3000, playerName)
-                    return
-                end
+    if isInsideAreas(g_config.dropOffAreas, xPlayerPosition, yPlayerPosition) then
+        if player and down == true and keyCode == 32 then
+            if player.carrying == 2 then
+                player.carrying = 0
+                tfm.exec.removeCheese(playerName)
+                increasePlayerScore(playerName)
+                print(playerName .. " ha consegnato il regalo")
+                showToast("<p align=\"center\">Regalo consegnato!", 3000, playerName)
+                return
             end
         end
     end
@@ -324,8 +366,19 @@ end
 function eventNewPlayer(playerName)
     if isAdministrator(playerName) then
         tfm.exec.setNameColor(playerName, 0x009DFF)
+        if isPlayer(playerName) then
+            addPlayer(playerName)
+        end
     else
         addPlayer(playerName)
+    end
+    local player = tfm.get.room.playerList[playerName]
+    if player and player.isDead then
+        tfm.exec.respawnPlayer(playerName)
+        print("eventNewPlayer(\"" .. playerName .."\") - score:" .. player.score)
+    end
+    if g_gameState == 2 then
+        openDoor()
     end
 end
 
@@ -335,10 +388,6 @@ end
 
 function eventPlayerRespawn(playerName)
     tfm.exec.movePlayer(playerName, g_config.spawn.x, g_config.spawn.y, false, 0, 0, false)
-end
-
-function eventNewGame()
-    resetGame()
 end
 
 function eventLoop(currentTime, timeRemaining)
