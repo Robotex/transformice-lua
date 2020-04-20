@@ -16,7 +16,7 @@ local g_config = {
     dropOffAreas = {
         {x1 = 109, y1 = 285, x2 = 284, y2 = 384}
     },
-    minigameChars = {"q","r","u","o","p","f","g","h","j","k","l","z","x","c","v","b","n","m"},
+    minigameChars = {"q","u","o","p","f","g","h","j","k","l","z","x","c","v","b","n","m"},
     map = "@7550816",
     doorId = 10
 }
